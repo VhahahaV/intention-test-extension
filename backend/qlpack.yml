@@ -1,0 +1,4 @@
+name: codeql-query-pack
+version: 1.0.0
+dependencies:
+  codeql/java-all: 1.22.1
