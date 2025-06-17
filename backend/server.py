@@ -64,7 +64,8 @@ class QueryHandler(http.server.BaseHTTPRequestHandler):
 
             try:
                 self.request.settimeout(2.0)
-                query_text = self.rfile.read(int(self.headers['Content-Length'])).decode('utf-8')
+                query_text_bytes = self.rfile.read(int(self.headers['Content-Length']))
+                query_text = query_text_bytes.decode('utf-8')
                 self.request.settimeout(None)
 
                 try:

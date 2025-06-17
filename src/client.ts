@@ -16,7 +16,7 @@ export class TesterSession {
     }
 
     async changeJunitVersion(version: string) {
-        const requestData = JSON.stringify({ type: 'change_junit_version', data: version });
+        const requestData = new TextEncoder().encode(JSON.stringify({ type: 'change_junit_version', data: version }) + '\n');
 
         const options: RequestOptions = {
             hostname: 'localhost',
@@ -46,13 +46,13 @@ export class TesterSession {
             console.error(`Problem on request: ${e}`);
         });
 
-        req.write(requestData + '\n');
+        req.write(requestData);
         req.end();
         await finishePromise;
     }
 
     async startQuery(args: any, cancelCb: (e: any) => any) {
-        const requestData = JSON.stringify({ type: 'query', data: args });
+        const requestData = new TextEncoder().encode(JSON.stringify({ type: 'query', data: args }) + '\n');
 
         const options: RequestOptions = {
             hostname: 'localhost',
@@ -127,7 +127,7 @@ export class TesterSession {
         req.on('error', (e) => {
             console.error(`Problem on request: ${e}`);
         });
-        req.write(requestData + '\n');
+        req.write(requestData);
         req.end();
         await finishePromise;
     }
