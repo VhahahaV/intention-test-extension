@@ -37,7 +37,7 @@ export function activate(context: vscode.ExtensionContext): void {
                 // }
 
                 const inputDescriptionPrompt = `# Note: this description will become part of the prompt of ${ExtensionMetadata.TOOL_NAME}.\n# Enter the description, save it, then close the editor to start generation. Leave it empty for doing nothing.`;
-                const inputDescriptionPlaceholder = `A description of test...\n\n${inputDescriptionPrompt}`;
+                const inputDescriptionPlaceholder = `# Objective\n...\n\n# Preconditions\n1. ...\n# Expected Results\n1. ...\n\n${inputDescriptionPrompt}`;
                 const firstLineSelection = new vscode.Range(
                     new vscode.Position(0, 0),
                     new vscode.Position(1, 0)
@@ -86,11 +86,11 @@ export function activate(context: vscode.ExtensionContext): void {
     setWebRoot(context.asAbsolutePath('web'));
 }
 
-async function generateTest(focalMethod: string, focalFile: string, testCaseName: string, projectAbsPath: string, focalFileAbsPath: string, ui: TesterWebViewProvider): Promise<void> {
+async function generateTest(focalMethod: string, focalFile: string, testDesc: string, projectAbsPath: string, focalFileAbsPath: string, ui: TesterWebViewProvider): Promise<void> {
     const generateParams = {
         "target_focal_method": focalMethod,
         "target_focal_file": focalFile,
-        "target_test_case_name": testCaseName,
+        "test_desc": testDesc,
         "project_path": projectAbsPath,
         "focal_file_path": focalFileAbsPath
     };

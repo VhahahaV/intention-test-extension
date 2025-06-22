@@ -82,15 +82,15 @@ class TestCaseRunner():
         for each_test_case in tqdm(test_cases, ncols=80, desc='Running test cases'):
             focal_file_path = each_test_case['focal_file_path']
 
-            generation_relative_path = each_test_case[f'generation_{is_ref}_path']
-            tc_path = f"{self.configs.project_dir}/{generation_relative_path}"
-            tc = each_test_case[f'generation_{is_ref}']
+            generation_relative_path = each_test_case['test_case_path']
+            tc_path = f"{self.configs.project_with_test_workspace}/{generation_relative_path}"
+            tc = each_test_case['generated_test_case']
             fm_name_param = each_test_case['focal_method_name'].split('::::')[1]
 
             log_path, focal_file_coverage, fm_cov_statistic_by_jacoco = self.run_test_case_and_get_coverage(tc, tc_path, focal_file_path, fm_name_param, is_ref=is_ref)
             each_test_case[f'log_path_{is_ref}'] = log_path
-            each_test_case[f'coverage_{is_ref}'] = focal_file_coverage  # used for analyze_coverage_with_target_coverage()
-            each_test_case[f'coverage_fm_{is_ref}'] = fm_cov_statistic_by_jacoco  # used for analyze_coverage_with_target_focal_method()
+            each_test_case[f'coverage_focal_file'] = focal_file_coverage  # used for analyze_coverage_with_target_coverage()
+            each_test_case[f'coverage_focal_method'] = fm_cov_statistic_by_jacoco  # used for analyze_coverage_with_target_focal_method()
 
             test_case_with_log_coverage.append(each_test_case)
         return test_case_with_log_coverage
@@ -141,6 +141,13 @@ class TestCaseRunner():
 
         return tc_run_log_path, focal_file_coverage, fm_cov_statistic_by_jacoco
 
+    def get_coverage_jacoco(self, test_case_path, focal_file_path, focal_method_name_parameter):
+
+        focal_file_coverage, fm_cov_statistic_by_jacoco = self.get_focal_file_coverage(focal_file_path, test_case_path, focal_method_name_parameter)  # used for analyze_coverage_with_target_coverage()
+        focal_file_coverage = ''.join(focal_file_coverage) if focal_file_coverage is not None else None
+
+        return focal_file_coverage, fm_cov_statistic_by_jacoco
+
     def compile_and_execute_test_case(self, test_case, test_case_path):
         compile_success, execute_success = False, False
         compile_log, test_log = '', ''
@@ -153,35 +160,16 @@ class TestCaseRunner():
 
         test_case_relative_path = self.get_test_case_relative_path(test_case_path)
 
-        mvn = 'mvn'
-        try:
-            subprocess.run(['mvn', '--version'])
-        except Exception as e:
-            logger.warning('"mvn" not found, try using "mvn.cmd"')
-            mvn = 'mvn.cmd'
-
         cwd_path = test_case_path.split('/src/test/')[0]
-        mvn_compile_cmd = [mvn, 'clean', f'-Dtest={test_case_relative_path}', 'test-compile', '-Dcheckstyle.skip=true']
-
-        # Add shell=True or mvn cannot be found on Windows, but this could cause a GBK output
-        # This step must keep using system encoding if using shell=True
-        # because mvn can sometimes use system output, not utf8, causing an error like:
-        #   (result, consumed) = self._buffer_decode(data, self.errors, final)
-        #   UnicodeDecodeError: 'utf-8' codec can't decode byte 0xca
-        # Thus, alternatively, add maven to the system path is the best compromise
-        
-        # mvn.cmd instead of mvn could be found
-
-        logger.debug(f'[Compiling] CWD: {cwd_path}. Command: {" ".join(mvn_compile_cmd)}')
-        compile_result = self.run_with_err_out(mvn_compile_cmd, cwd=cwd_path, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)    
+        mvn_compile_cmd = ['mvn', 'clean', f'-Dtest={test_case_relative_path}', 'test-compile', '-Dcheckstyle.skip=true']
+        compile_result = subprocess.run(mvn_compile_cmd, cwd=cwd_path, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, universal_newlines=True)
         compile_log = f'{compile_result.stdout}\n\n{compile_result.stderr}\n\n'
 
         if "BUILD SUCCESS" in compile_log:
             compile_success = True
 
-            mvn_test_cmd = [mvn, 'clean', 'verify', f'-Dtest={test_case_relative_path}', '-Dcheckstyle.skip=true']  # test and get the coverage
-            logger.debug(f'[Testing] CWD: {cwd_path}. Command: {" ".join(mvn_compile_cmd)}')
-            test_result = self.run_with_err_out(mvn_test_cmd, cwd=cwd_path, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+            mvn_test_cmd = ['mvn', 'clean', 'verify', f'-Dtest={test_case_relative_path}', '-Dcheckstyle.skip=true']  # test and get the coverage
+            test_result = subprocess.run(mvn_test_cmd, cwd=cwd_path, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, universal_newlines=True)
             test_log = f'{test_result.stdout}\n\n{test_result.stderr}'
             if "BUILD SUCCESS" in test_log:
                 execute_success = True

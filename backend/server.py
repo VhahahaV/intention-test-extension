@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 # basiConfig can only be called once
 logging.basicConfig(stream=sys.stdout, level=logging.INFO, format='[%(asctime)s] [%(levelname)s] %(message)s')
 
-global_junit_version = 5
+global_junit_version = 4
 
 class StatusMessage:
     def __init__(self, status: str, message: str | dict = ''):
@@ -134,7 +134,7 @@ class QueryHandler(http.server.BaseHTTPRequestHandler):
 
 class ModelQuerySession:
     '''Session persistent data.'''
-    required_fields = ['target_focal_method', 'target_focal_file', 'target_test_case_name', 'project_path', 'focal_file_path']
+    required_fields = ['target_focal_method', 'target_focal_file', 'test_desc', 'project_path', 'focal_file_path']
 
     def __init__(self, session_id: str, raw_data: dict, handler: QueryHandler):
         self.session_id = session_id

@@ -38,10 +38,10 @@ def collect_pairs(repo_path, do_dynamic_analysis=False):
             if not os.path.exists(full_test_path):
                 continue
 
-            with open(full_test_path) as f:
+            with open(full_test_path, encoding='utf-8') as f:
                 test_content = f.readlines()
             
-            with open(full_focal_path) as f:
+            with open(full_focal_path, encoding='utf-8') as f:
                 focal_content = f.readlines()
 
             test_method_lines_dic, test_reverse_method_lines_dic = utils.get_method_lines(full_test_path)
