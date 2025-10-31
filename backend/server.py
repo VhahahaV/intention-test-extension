@@ -12,6 +12,7 @@ import traceback
 import argparse
 import main
 import hashlib
+from typing import Optional, Union
 
 port = 8080
 
@@ -23,7 +24,7 @@ logging.basicConfig(stream=sys.stdout, level=logging.INFO, format='[%(asctime)s]
 global_junit_version = 4
 
 class StatusMessage:
-    def __init__(self, status: str, message: str | dict = ''):
+    def __init__(self, status: str, message: Union[str, dict] = ''):
         self.status = status
         self.message = message
     
@@ -191,7 +192,7 @@ def get_hash(s: str):
 
 sessions: dict[str, ModelQuerySession] = {}
 
-def assign_to_session(query_text: str, query_handler: QueryHandler) -> ModelQuerySession | None:
+def assign_to_session(query_text: str, query_handler: QueryHandler) -> Optional[ModelQuerySession]:
     # do with sessions
     query_data = json.loads(query_text)
     if query_data['type'] != 'query':

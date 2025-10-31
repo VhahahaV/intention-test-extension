@@ -57,14 +57,15 @@ class Agent:
                     top_p=self.top_p,
                     seed=self.seed,
                     stream=False,
-                    max_completion_tokens=self.max_completion_tokens,
+                    max_tokens=self.max_completion_tokens,
                     n=n,
                 )
             except Exception as e:
                 print(f'\nError: {e}\n\n')
                 n_tries += 1
                 if n_tries > max_tries:
-                    each_response = '```\n\n[ERROR] Failed to generate\n\n```'
+                    fallback = '```\n[ERROR] Failed to generate due to API error or quota.\n```'
+                    response.append(fallback)
                     break
                 continue
             
@@ -91,7 +92,7 @@ class Agent:
                     temperature=self.temp,
                     seed=self.seed,
                     stream=False,
-                    max_completion_tokens=self.max_completion_tokens,
+                    max_tokens=self.max_completion_tokens,
                     n=n,
                 )
             except Exception as e:
@@ -124,7 +125,8 @@ class Agent:
                 
                 n_tries += 1
                 if n_tries > max_tries:
-                    each_response = '```\n\n[ERROR] Failed to generate\n\n```'
+                    fallback = '```\n[ERROR] Failed to generate due to API error or quota.\n```'
+                    response.append(fallback)
                     break
                 continue
             
@@ -154,7 +156,7 @@ class Agent:
                     temperature=0.6,
                     seed=self.seed,
                     stream=False,
-                    max_completion_tokens=self.max_completion_tokens,
+                    max_tokens=self.max_completion_tokens,
                     n=1
                 )
             except Exception as e:
@@ -173,6 +175,11 @@ class Agent:
                     messages[0]['content'] = messages[0]['content'].replace(context_part, reduced_context_part)
 
                     continue
+                # when API/quota errors persist, append fallback to avoid empty response
+                n_tries += 1
+                if n_tries >= max_tries:
+                    response.append('```\n[ERROR] Failed to generate due to API error or quota.\n```')
+                    break
 
             print(f'Time consuming for one generation: {time.time()-s_time:.2f} seconds\n\n')
             print(f'[INFO] Response:\n{each_response_raw.choices[0].message.content}\n\n\n')
