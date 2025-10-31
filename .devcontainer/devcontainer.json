@@ -1,6 +1,8 @@
 {
   "name": "intention-test-dev",
-  "image": "mcr.microsoft.com/devcontainers/universal:2",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
   "remoteUser": "vscode",
   "containerEnv": {
     "PYTHONUNBUFFERED": "1"
