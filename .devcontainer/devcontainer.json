@@ -1,8 +1,10 @@
 {
   "name": "intention-test-dev",
   "build": {
-    "dockerfile": "Dockerfile"
+    "dockerfile": "Dockerfile",
+    "context": ".."
   },
+  "features": {},
   "remoteUser": "vscode",
   "containerEnv": {
     "PYTHONUNBUFFERED": "1"

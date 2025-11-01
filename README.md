@@ -44,36 +44,62 @@ And an [**OpenAI API key**](https://platform.openai.com/docs/guides/production-b
 
 Note: The repository also provides `setup/MACOS.sh` to help configure environment variables and CodeQL linking (it expects you to download installers yourself first).
 
-### Start up the Python backend
+### Start the backend via Docker (recommended)
 
-We suggest using **Python 3.10** which has been tested on.
-First install the requirements:
+Pull the latest image from Docker Hub and start the container:
 
-```shell
+```bash
+docker pull vhahahav/intention_test:latest
+docker run -d --name intention-test \
+  -p 8080:8080 \
+  -e OPENAI_API_KEY="your-open-ai-key" \
+  vhahahav/intention_test:latest
+```
+
+The container writes `backend/config.ini` automatically and starts `python server.py --port 8080`.  
+To use another port, change the mapping and environment variable:
+
+```bash
+docker run -d --name intention-test \
+  -p 8090:8090 \
+  -e SERVER_PORT=8090 \
+  -e OPENAI_API_KEY="your-open-ai-key" \
+  vhahahav/intention_test:latest
+```
+
+Logs can be tailed with `docker logs -f intention-test`.  
+To rebuild locally instead of pulling, follow `DEPLOY.md`.
+
+#### Hot-reload development with volume mount
+
+To develop against the live source tree, bind-mount the repository so container code follows your local changes:
+
+```bash
+docker run -d --name intention-test-dev \
+  -p 8080:8080 \
+  -e OPENAI_API_KEY="your-open-ai-key" \
+  -v /path/to/intention-test-extension:/app \
+  vhahahav/intention_test:latest
+```
+
+- `/app` inside the container mirrors your host repo; edits on the host take effect immediately.
+- Ensure the host directory grants read/write permissions to UID/GID `1000:1000` (container user `vscode`).
+- If necessary, add `-u $(id -u):$(id -g)` so the container process runs with your host UID/GID.
+
+### Start the backend locally (alternative)
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r backend/requirements.txt
 cd backend
-pip install -r requirements.txt
+cp config.ini config.local.ini  # Optional backup
+vim config.ini                  # 填写 OPENAI KEY 与 codeql 路径
+python server.py --port 8080
 ```
 
-Modify the `backend/config.ini`:
-
-```ini
-[openai]
-apikey = your-open-ai-key
-url = https://api.openai.com/v1
-
-[tools]
-codeql = /Users/<you>/.local/bin/codeql
-```
-
-Then start the backend HTTP server:
-
-```shell
-# Start on default 8080 port
-python server.py
-
-# Start on another port
-python server.py --port 12345
-```
+Ensure Java 8, Maven, CodeQL CLI, and PyTorch are installed as listed above.  
+When developing outside Docker, update `config.ini` manually and keep the `codeql` path valid.
 
 ### Run the extension in debug mode
 
@@ -83,7 +109,18 @@ First install node dependencies from project root:
 npm install
 ```
 
-Then in Cursor/VS Code, open Command Palette → Start Debugging, select `Run Extension`.
+Then in Cursor/VS Code, run the extension host:
+
+```bash
+# 编译 TypeScript（watch mode）
+npm run watch
+
+# 另开终端启动扩展调试
+npx vsce package # (可选，仅需一次)
+code --extensionDevelopmentPath=$(pwd)
+```
+
+或在 VS Code 中按 `F5` / Command Palette → “Debug: Start Debugging” 选择 `Run Extension`。
 
 If you have specify another port when starting backend server,
 change the port in **settings of the new Extension Development Host window** via `Intention Test: Port` before generating test cases.
