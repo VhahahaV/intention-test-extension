@@ -154,7 +154,7 @@ Paste a valid description in the extension panel (required by backend parser):
 ### Troubleshooting
 - If the extension shows “Waiting for request...”, ensure backend is running and port matches `Intention Test: Port`.
 - If you see JSON errors with `HTTP/1.0 5xx`, check backend console for missing config (OpenAI url/apikey, CodeQL path, JAVA_HOME).
-- If OpenAI API returns 429 (quota), the backend will surface a readable error instead of crashing; update your key/plan to proceed.
+- If OpenAI API returns 429 (quota), the backend will surface a readable error instead of crashing; update your key/plan to proceed.g
 
 ## Acknowledgements
 
