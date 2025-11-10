@@ -7,7 +7,7 @@ CONFIG_FILE="backend/config.ini"
 APP_USER="${APP_USER:-vscode}"
 APP_HOME="${APP_HOME:-/home/${APP_USER}}"
 OPENAI_KEY="${OPENAI_API_KEY:-}"
-OPENAI_URL="${OPENAI_API_URL:-https://api.openai.com/v1}"
+OPENAI_URL="${OPENAI_API_URL:-https://api.chatanywhere.tech/v1}"
 CODEQL_BIN="${CODEQL_PATH:-${APP_HOME}/.local/bin/codeql}"
 PORT="${SERVER_PORT:-8080}"
 

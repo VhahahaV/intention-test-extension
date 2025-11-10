@@ -53,8 +53,14 @@ docker pull vhahahav/intention_test:latest
 docker run -d --name intention-test \
   -p 8080:8080 \
   -e OPENAI_API_KEY="your-open-ai-key" \
+  -e OPENAI_API_URL="https://api.chatanywhere.tech/v1" \
   vhahahav/intention_test:latest
 ```
+
+**API 端点配置**：
+- 默认使用 `https://api.chatanywhere.tech/v1`（国内推荐，延迟更低）
+- 国外用户可使用：`https://api.chatanywhere.org/v1`
+- 使用官方 OpenAI API：`https://api.openai.com/v1`
 
 The container writes `backend/config.ini` automatically and starts `python server.py --port 8080`.  
 To use another port, change the mapping and environment variable:
@@ -94,7 +100,11 @@ source .venv/bin/activate
 pip install -r backend/requirements.txt
 cd backend
 cp config.ini config.local.ini  # Optional backup
-vim config.ini                  # 填写 OPENAI KEY 与 codeql 路径
+vim config.ini                  # 填写 OPENAI KEY、URL 与 codeql 路径
+# config.ini 示例：
+# [openai]
+# apikey = your-api-key
+# url = https://api.chatanywhere.tech/v1  # 或 https://api.chatanywhere.org/v1（国外）
 python server.py --port 8080
 ```
 
