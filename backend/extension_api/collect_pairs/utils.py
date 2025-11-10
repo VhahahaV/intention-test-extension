@@ -15,7 +15,21 @@ unused_classes_del_jar_path = "../javaparser_utils/javaparser-unused-classes-del
 def run_result_lines(args):
     # for formality
     # deal with difference of `subprocess.run` output between Windows and Linux
-    process = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    # Ensure JAVA_HOME is passed to subprocess
+    import os
+    env = os.environ.copy()
+    if 'JAVA_HOME' not in env or not env['JAVA_HOME']:
+        java_home_candidates = [
+            '/usr/lib/jvm/java-8-openjdk-amd64',
+            '/usr/lib/jvm/java-8-openjdk',
+            '/Library/Java/JavaVirtualMachines/jdk-1.8.jdk/Contents/Home',
+        ]
+        for candidate in java_home_candidates:
+            if os.path.exists(candidate):
+                env['JAVA_HOME'] = candidate
+                env['PATH'] = f"{candidate}/bin:{env.get('PATH', '')}"
+                break
+    process = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
     if process.returncode != 0:
         logger.error(f'Error running "{args}". The outputs are: \nstderr:\n{process.stderr.decode("utf-8")}stdout:\n{process.stdout.decode("utf-8")}')
     result = process.stdout.decode('utf-8')
@@ -116,7 +130,21 @@ def generate_codecov(base_path, test_class_name, test_method_name):
     args = ["mvn", "clean", "verify", "-Dtest=" + test_class_name + "#" + test_method_name]
     logger.debug(f'Generating code coverage info: {args}')
     # args = ["mvn", "verify", "-Dtest=" + test_class_name + "#" + test_method_name]
-    subprocess.run(args, cwd=base_path, stdout=None, stderr=None)
+    # Ensure JAVA_HOME is passed to subprocess
+    import os
+    env = os.environ.copy()
+    if 'JAVA_HOME' not in env or not env['JAVA_HOME']:
+        java_home_candidates = [
+            '/usr/lib/jvm/java-8-openjdk-amd64',
+            '/usr/lib/jvm/java-8-openjdk',
+            '/Library/Java/JavaVirtualMachines/jdk-1.8.jdk/Contents/Home',
+        ]
+        for candidate in java_home_candidates:
+            if os.path.exists(candidate):
+                env['JAVA_HOME'] = candidate
+                env['PATH'] = f"{candidate}/bin:{env.get('PATH', '')}"
+                break
+    subprocess.run(args, cwd=base_path, stdout=None, stderr=None, env=env)
 
 # base_path = '/bernard/dataset_construction/prep/repos/spark'
 # test_class_name = 'utils.CollectionUtilsTest'

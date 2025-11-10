@@ -161,15 +161,30 @@ class TestCaseRunner():
         test_case_relative_path = self.get_test_case_relative_path(test_case_path)
 
         cwd_path = test_case_path.split('/src/test/')[0]
+        # Ensure JAVA_HOME is passed to subprocess
+        env = os.environ.copy()
+        if 'JAVA_HOME' not in env or not env['JAVA_HOME']:
+            # Try to set JAVA_HOME from common locations
+            java_home_candidates = [
+                '/usr/lib/jvm/java-8-openjdk-amd64',
+                '/usr/lib/jvm/java-8-openjdk',
+                '/Library/Java/JavaVirtualMachines/jdk-1.8.jdk/Contents/Home',
+            ]
+            for candidate in java_home_candidates:
+                if os.path.exists(candidate):
+                    env['JAVA_HOME'] = candidate
+                    env['PATH'] = f"{candidate}/bin:{env.get('PATH', '')}"
+                    break
+        
         mvn_compile_cmd = ['mvn', 'clean', f'-Dtest={test_case_relative_path}', 'test-compile', '-Dcheckstyle.skip=true']
-        compile_result = subprocess.run(mvn_compile_cmd, cwd=cwd_path, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, universal_newlines=True)
+        compile_result = subprocess.run(mvn_compile_cmd, cwd=cwd_path, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, universal_newlines=True, env=env)
         compile_log = f'{compile_result.stdout}\n\n{compile_result.stderr}\n\n'
 
         if "BUILD SUCCESS" in compile_log:
             compile_success = True
 
             mvn_test_cmd = ['mvn', 'clean', 'verify', f'-Dtest={test_case_relative_path}', '-Dcheckstyle.skip=true']  # test and get the coverage
-            test_result = subprocess.run(mvn_test_cmd, cwd=cwd_path, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, universal_newlines=True)
+            test_result = subprocess.run(mvn_test_cmd, cwd=cwd_path, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, universal_newlines=True, env=env)
             test_log = f'{test_result.stdout}\n\n{test_result.stderr}'
             if "BUILD SUCCESS" in test_log:
                 execute_success = True
