@@ -68,7 +68,7 @@ RUN mkdir -p ${APP_HOME}/.local/apps ${APP_HOME}/.local/bin \
     && ln -sf "${CODEQL_DIR}/codeql" ${APP_HOME}/.local/bin/codeql
 
 # Default config values; entrypoint will rewrite the config with env values
-ENV OPENAI_API_URL=https://api.openai.com/v1 \
+ENV OPENAI_API_URL=https://api.chatanywhere.tech/v1 \
     CODEQL_PATH=${APP_HOME}/.local/bin/codeql \
     SERVER_PORT=8080
 
