@@ -1,11 +1,14 @@
 // create a python subprocess and communicate with it through network
-import { request, RequestOptions } from 'http';
+import { request, RequestOptions, ClientRequest } from 'http';
 
 export class TesterSession {
     private updateMessageCallback?: (...args: any[]) => any;
     private errorCallbcak?: (...args: any[]) => any;
     private showNoRefMsg?: (...args: any[]) => any;
     private connectToPort: number;
+    private currentRequest?: ClientRequest;
+    private finishActiveRequest?: () => void;
+    private isCancelling = false;
     
     // setting connectToPort to 0 to start up an internal server
     constructor(updateMessageCallback?: (...args: any[]) => any, errorCallback?: (...args: any[]) => any, showNoRefMsg?: (...args: any[]) => any, connectToPort: number = 0) {
@@ -66,7 +69,12 @@ export class TesterSession {
         };
 
         let finish: (value?: any) => void;
-        const finishePromise = new Promise((res, rej) => { finish = res; });
+        const finishePromise = new Promise<void>((res) => { finish = res; });
+        this.finishActiveRequest = () => {
+            finish();
+            this.resetRequestState();
+        };
+        this.isCancelling = false;
         const req = request(options, (res) => {
             let status = 'before-start';
 
@@ -88,7 +96,7 @@ export class TesterSession {
                         if (msg.type && msg.data) {
                             if (msg.type === 'status' && msg.data.status === 'finish') {
                                 status = 'finished';
-                                finish();
+                                this.finishActiveRequest?.();
                                 return;
                             } else if (msg.type === 'msg' && msg.data.session_id && msg.data.messages) {
                                 if (this.updateMessageCallback) {
@@ -109,26 +117,53 @@ export class TesterSession {
                     }
                     
                 } catch (e) {
-                    console.error(e);
-                    cancelCb(e);
+                    if (!this.isCancelling) {
+                        console.error(e);
+                        cancelCb(e);
+                    }
                 }
             });
 
             res.on('end', () => {
                 console.log('No more data in response.');
-                // this.close();
+                if (!this.isCancelling) {
+                    this.resetRequestState();
+                }
             });
 
             res.on('error', (e) => {
+                if (this.isCancelling) {
+                    return;
+                }
                 console.error(e);
             });
         });
+        this.currentRequest = req;
 
         req.on('error', (e) => {
+            if (this.isCancelling) {
+                return;
+            }
             console.error(`Problem on request: ${e}`);
         });
         req.write(requestData);
         req.end();
         await finishePromise;
+        this.resetRequestState();
+    }
+
+    public cancelCurrentQuery(): void {
+        if (!this.currentRequest) {
+            return;
+        }
+        this.isCancelling = true;
+        this.currentRequest.destroy();
+        this.finishActiveRequest?.();
+    }
+
+    private resetRequestState(): void {
+        this.currentRequest = undefined;
+        this.finishActiveRequest = undefined;
+        this.isCancelling = false;
     }
 }

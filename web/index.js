@@ -2,12 +2,24 @@ const noMessagePrompt = document.getElementById('no-message');
 const chatContainer = document.getElementById('chat-container');
 const toolbar = document.getElementById('toolbar');
 const body = document.body;
+const defaultNoMessageMarkup = noMessagePrompt.innerHTML;
+const waitingNoMessageMarkup = `
+    <h1>Intention Test 🧪</h1>
+    <div>正在等待新的响应...</div>
+`.trim();
+const SessionState = {
+    IDLE: 'idle',
+    RUNNING: 'running',
+    STOPPING: 'stopping',
+    STOPPED: 'stopped'
+};
 
 const OPEN_CODE_ICON = '<svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#5f6368"><path d="M189.06-113.3q-31 0-53.38-22.38-22.38-22.38-22.38-53.38v-581.88q0-31.06 22.38-53.49 22.38-22.43 53.38-22.43H466v75.92H189.06v581.88h581.88V-466h75.92v276.94q0 31-22.43 53.38Q802-113.3 770.94-113.3H189.06Zm201.08-223.37-52.81-53.47 380.81-380.8H532.67v-75.92h314.19v314.19h-75.92v-184.8l-380.8 380.8Z"></path></svg>';
 const RESTART_ICON = '<svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#5f6368"><path d="M480-100q-70.77 0-132.61-26.77-61.85-26.77-107.85-72.77-46-46-72.77-107.85Q140-369.23 140-440h60q0 117 81.5 198.5T480-160q117 0 198.5-81.5T760-440q0-117-81.5-198.5T480-720h-10.62l63.54 63.54-42.15 43.38-136.92-137.3 137.69-137.31 42.15 43.38L469.38-780H480q70.77 0 132.61 26.77 61.85 26.77 107.85 72.77 46 46 72.77 107.85Q820-510.77 820-440q0 70.77-26.77 132.61-26.77 61.85-72.77 107.85-46 46-107.85 72.77Q550.77-100 480-100Z"/></svg>';
 
 let messageCount = 0;
 let lastUserScrollTime = Date.now();
+let sessionState = SessionState.IDLE;
 
 const canConnectToVsCode = typeof acquireVsCodeApi === 'function';
 if (canConnectToVsCode) {
@@ -16,7 +28,7 @@ if (canConnectToVsCode) {
 
 const toolbarHandlers = {
     'clear-chat': requestClearConversation,
-    'scroll-latest': scrollToLatest
+    'stop-run': requestStopConversation
 };
 
 toolbar?.querySelectorAll('[data-action]').forEach((button) => {
@@ -26,6 +38,8 @@ toolbar?.querySelectorAll('[data-action]').forEach((button) => {
         button.addEventListener('click', handler);
     }
 });
+updateToolbarState();
+updatePlaceholderVisibility();
 
 body.addEventListener('wheel', () => {
     lastUserScrollTime = Date.now();
@@ -48,25 +62,75 @@ function maybeAutoScroll() {
     }
 }
 
-function setConversationLength(targetCount = 0) {
-    const normalized = Math.max(0, targetCount);
+function trimConversationTo(targetCount = 0) {
+    const normalized = Math.max(0, Number.isFinite(targetCount) ? Math.trunc(targetCount) : 0);
     messageCount = normalized;
     const nodesToKeep = normalized * 2;
     while (chatContainer.children.length > nodesToKeep) {
         chatContainer.removeChild(chatContainer.lastChild);
     }
-    noMessagePrompt.style.display = chatContainer.children.length === 0 ? 'block' : 'none';
-}
-
-function resetConversation() {
-    setConversationLength(0);
+    if (normalized === 0) {
+        removeTypingAnimation();
+    }
+    updatePlaceholderVisibility();
 }
 
 function requestClearConversation() {
-    if (window.vscode) {
-        window.vscode.postMessage({ cmd: 'clear-chat' });
+    window.vscode?.postMessage({ cmd: 'clear-chat' });
+    trimConversationTo(0);
+}
+
+function requestStopConversation() {
+    if (sessionState !== SessionState.RUNNING) {
+        addSystemNotice('当前没有正在运行的请求。');
+        return;
     }
-    resetConversation();
+    setSessionState(SessionState.STOPPING);
+    addSystemNotice('正在尝试停止当前生成...');
+    window.vscode?.postMessage({ cmd: 'stop-run' });
+}
+
+function setSessionState(nextState) {
+    if (!nextState) {
+        return;
+    }
+    sessionState = nextState;
+    if (nextState !== SessionState.RUNNING) {
+        removeTypingAnimation();
+    }
+    updateToolbarState();
+    updatePlaceholderVisibility();
+}
+
+function updateToolbarState() {
+    if (!toolbar) {
+        return;
+    }
+    const stopButton = toolbar.querySelector('[data-action="stop-run"]');
+    if (stopButton) {
+        const isStopping = sessionState === SessionState.STOPPING;
+        const canStop = sessionState === SessionState.RUNNING;
+        stopButton.disabled = !canStop;
+        stopButton.textContent = isStopping ? '停止中…' : '停止';
+    }
+}
+
+function updatePlaceholderVisibility() {
+    const hasMessages = chatContainer.children.length > 0;
+    if (hasMessages) {
+        noMessagePrompt.style.display = 'none';
+        return;
+    }
+    if (sessionState === SessionState.RUNNING || sessionState === SessionState.STOPPING) {
+        noMessagePrompt.innerHTML = waitingNoMessageMarkup;
+    } else {
+        noMessagePrompt.innerHTML = defaultNoMessageMarkup;
+    }
+    noMessagePrompt.style.display = 'block';
+}
+
+function addSystemNotice(message) {
+    addMessage(message, 'system', { senderType: 'system' });
 }
 
 function createMessageContent(message, isHtml) {
@@ -120,6 +184,7 @@ function addMessage(message, sender, options = {}) {
     }
 
     maybeAutoScroll();
+    updatePlaceholderVisibility();
     return messageElement;
 }
 
@@ -212,6 +277,7 @@ function completeTypingAnimation(message, sender, options = {}) {
 
     typingElement.index = messageCount;
     maybeAutoScroll();
+    updatePlaceholderVisibility();
     return typingElement;
 }
 
@@ -223,6 +289,7 @@ function removeTypingAnimation() {
             chatContainer.removeChild(header);
         }
         chatContainer.removeChild(typingElement);
+        updatePlaceholderVisibility();
     }
 }
 
@@ -253,10 +320,18 @@ window.addEventListener('message', (event) => {
             messageCount += 1;
         }
     } else if (msg?.cmd) {
-        if (msg.cmd === 'error') {
+        if (msg.cmd === 'session-state') {
+            const nextState = msg.state ?? SessionState.IDLE;
+            setSessionState(nextState);
+            if (typeof msg.message === 'string' && msg.message.trim().length > 0) {
+                addSystemNotice(msg.message);
+            } else if (nextState === SessionState.STOPPED) {
+                addSystemNotice('生成已停止，不再继续。');
+            }
+        } else if (msg.cmd === 'error') {
             console.error('[IntentionTest] Webview error message received:', msg);
         } else if (msg.cmd === 'clear') {
-            setConversationLength(msg.toIndex ?? 0);
+            trimConversationTo(msg.toIndex ?? 0);
         }
     }
 });

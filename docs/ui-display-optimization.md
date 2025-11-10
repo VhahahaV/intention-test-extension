@@ -25,6 +25,7 @@
 
 ## 第三阶段优化
 - **统一高亮主题**：摒弃 Highlight.js 默认样式，转而使用 VS Code 主题变量自定义 `.hljs` 配色，确保深浅主题都与编辑器一致。
-- **全局工具栏**：在 `index.html` 中新增顶部工具栏，提供“一键清空”“跳到最新”操作，配合新的 `toolbar-actions` 样式提升可见性与触达率。
-- **交互指令闭环**：`index.js` 新增 `requestClearConversation`，并让扩展端 (`sidebarView.ts`) 响应 `clear-chat` 消息，保证 Webview 与扩展状态一致。
-- **可维护滚动控制**：封装 `scrollToLatest/setConversationLength`，让自动滚动、手动跳转、清空对话都可复用同一逻辑，避免 DOM 失衡。
+- **全局工具栏**：顶部工具栏现提供“停止”“清空”双按钮，胶囊样式在 VS Code 深浅主题下都能清晰呈现操作意图。
+- **停止/清空联动**：Webview 会在 `session-state` 消息驱动下切换“运行/停止/空闲”状态；停止按钮会向扩展发送 `stop-run` 指令，取消后台请求并在前端展示“已停止”系统消息；清空按钮会在生成中显示等待占位、空闲时恢复欢迎页。
+- **交互指令闭环**：`TesterWebViewProvider` 向 `extension.ts` 暴露消息回调，扩展端统一处理 stop/clear，并通过 `session-state`/`clear` 指令回写 Webview，保持与后端同步。
+- **可维护滚动控制**：封装 `scrollToLatest/trimConversationTo/updatePlaceholderVisibility`，让自动滚动、手动跳转、清空等场景共享逻辑，同时避免代码块撑破消息容器。
