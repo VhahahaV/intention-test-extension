@@ -16,3 +16,9 @@
 - 统一移除 `index.html` 中的内联脚本，避免与 `index.js` 重复执行造成状态错乱。
 - 引入主题自适应的 Highlight.js 样式（或自定义样式），让代码高亮与 VS Code 主题完全一致。
 - 增加顶部工具栏（如刷新、清空、导出对话），进一步提升使用效率。
+
+## 第二阶段优化
+- **脚本解耦**：完全移除 `index.html` 内联脚本，只保留 `index.js` 作为单一入口，防止事件监听与状态重复注册。
+- **消息管线重写**：`web/index.js` 现使用结构化的 `addMessage/completeTypingAnimation`，修复 `sendMessage/raw/liveContentContainers` 等未定义引用，同时在 `clear` 指令时恢复空状态提示。
+- **代码块增强**：统一在 JS 层为 `pre code` 与行内 `code` 运行 `hljs.highlightElement`，并封装按钮装饰逻辑，避免重复创建监听器。
+- **交互细节**：自动滚动逻辑尊重用户最近 3 秒的滚动/鼠标操作；删除打字动画时同步移除标题，保持 DOM 干净。
