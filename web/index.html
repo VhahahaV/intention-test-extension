@@ -6,11 +6,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chat Bot</title>
     <link rel="stylesheet" href="styles.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.10.0/build/styles/default.min.css">
-    <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@latest/build/highlight.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.10.0/build/highlight.min.js"></script>
 </head>
 
 <body>
+    <header id="toolbar">
+        <div class="title">
+            <span class="name">Intention Test</span>
+            <span class="tagline">LLM-based iterative test assistant</span>
+        </div>
+        <div class="toolbar-actions">
+            <button type="button" data-action="scroll-latest">跳到最新</button>
+            <button type="button" data-action="clear-chat">清空对话</button>
+        </div>
+    </header>
     <div id="no-message">
         <h1>Intention Test 🧪</h1>
         <div>An LLM-based iterative test generator. <br/> Waiting for request...</div>

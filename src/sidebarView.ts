@@ -34,6 +34,8 @@ export class TesterWebViewProvider implements vscode.WebviewViewProvider {
             if (msg.cmd === 'open-code' && msg.content && msg.lang) {
                 const doc = await vscode.workspace.openTextDocument({ language: msg.lang, content: msg.content });
                 vscode.window.showTextDocument(doc);
+            } else if (msg.cmd === 'clear-chat') {
+                await this.showMessage({ cmd: 'clear' });
             }
         });
 

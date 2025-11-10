@@ -1,5 +1,6 @@
 const noMessagePrompt = document.getElementById('no-message');
 const chatContainer = document.getElementById('chat-container');
+const toolbar = document.getElementById('toolbar');
 const body = document.body;
 
 const OPEN_CODE_ICON = '<svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#5f6368"><path d="M189.06-113.3q-31 0-53.38-22.38-22.38-22.38-22.38-53.38v-581.88q0-31.06 22.38-53.49 22.38-22.43 53.38-22.43H466v75.92H189.06v581.88h581.88V-466h75.92v276.94q0 31-22.43 53.38Q802-113.3 770.94-113.3H189.06Zm201.08-223.37-52.81-53.47 380.81-380.8H532.67v-75.92h314.19v314.19h-75.92v-184.8l-380.8 380.8Z"></path></svg>';
@@ -13,6 +14,19 @@ if (canConnectToVsCode) {
     window.vscode = acquireVsCodeApi();
 }
 
+const toolbarHandlers = {
+    'clear-chat': requestClearConversation,
+    'scroll-latest': scrollToLatest
+};
+
+toolbar?.querySelectorAll('[data-action]').forEach((button) => {
+    const action = button.dataset.action;
+    const handler = action ? toolbarHandlers[action] : undefined;
+    if (handler) {
+        button.addEventListener('click', handler);
+    }
+});
+
 body.addEventListener('wheel', () => {
     lastUserScrollTime = Date.now();
 }, { passive: true });
@@ -21,13 +35,38 @@ body.addEventListener('mousedown', () => {
     lastUserScrollTime = Date.now();
 });
 
+function scrollToLatest() {
+    body.scrollTo({
+        top: body.scrollHeight,
+        behavior: 'smooth'
+    });
+}
+
 function maybeAutoScroll() {
     if (Date.now() - lastUserScrollTime > 3000) {
-        body.scrollTo({
-            top: body.scrollHeight,
-            behavior: 'smooth'
-        });
+        scrollToLatest();
     }
+}
+
+function setConversationLength(targetCount = 0) {
+    const normalized = Math.max(0, targetCount);
+    messageCount = normalized;
+    const nodesToKeep = normalized * 2;
+    while (chatContainer.children.length > nodesToKeep) {
+        chatContainer.removeChild(chatContainer.lastChild);
+    }
+    noMessagePrompt.style.display = chatContainer.children.length === 0 ? 'block' : 'none';
+}
+
+function resetConversation() {
+    setConversationLength(0);
+}
+
+function requestClearConversation() {
+    if (window.vscode) {
+        window.vscode.postMessage({ cmd: 'clear-chat' });
+    }
+    resetConversation();
 }
 
 function createMessageContent(message, isHtml) {
@@ -217,14 +256,7 @@ window.addEventListener('message', (event) => {
         if (msg.cmd === 'error') {
             console.error('[IntentionTest] Webview error message received:', msg);
         } else if (msg.cmd === 'clear') {
-            const targetCount = msg.toIndex ?? 0;
-            messageCount = targetCount;
-            while (chatContainer.children.length > 2 * targetCount) {
-                chatContainer.removeChild(chatContainer.lastChild);
-            }
-            if (chatContainer.children.length === 0) {
-                noMessagePrompt.style.display = 'block';
-            }
+            setConversationLength(msg.toIndex ?? 0);
         }
     }
 });

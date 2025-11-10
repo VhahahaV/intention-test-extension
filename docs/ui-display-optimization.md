@@ -22,3 +22,9 @@
 - **消息管线重写**：`web/index.js` 现使用结构化的 `addMessage/completeTypingAnimation`，修复 `sendMessage/raw/liveContentContainers` 等未定义引用，同时在 `clear` 指令时恢复空状态提示。
 - **代码块增强**：统一在 JS 层为 `pre code` 与行内 `code` 运行 `hljs.highlightElement`，并封装按钮装饰逻辑，避免重复创建监听器。
 - **交互细节**：自动滚动逻辑尊重用户最近 3 秒的滚动/鼠标操作；删除打字动画时同步移除标题，保持 DOM 干净。
+
+## 第三阶段优化
+- **统一高亮主题**：摒弃 Highlight.js 默认样式，转而使用 VS Code 主题变量自定义 `.hljs` 配色，确保深浅主题都与编辑器一致。
+- **全局工具栏**：在 `index.html` 中新增顶部工具栏，提供“一键清空”“跳到最新”操作，配合新的 `toolbar-actions` 样式提升可见性与触达率。
+- **交互指令闭环**：`index.js` 新增 `requestClearConversation`，并让扩展端 (`sidebarView.ts`) 响应 `clear-chat` 消息，保证 Webview 与扩展状态一致。
+- **可维护滚动控制**：封装 `scrollToLatest/setConversationLength`，让自动滚动、手动跳转、清空对话都可复用同一逻辑，避免 DOM 失衡。

@@ -5,6 +5,11 @@
     --border-color: var(--vscode-editorWidget-border, rgba(0, 0, 0, 0.08));
     --assistant-accent: var(--vscode-testing-iconPassed, #2ea043);
     --user-accent: var(--vscode-testing-iconQueued, #007acc);
+    --code-block-bg: var(--vscode-editor-background, #1e1e1e);
+    --code-block-foreground: var(--vscode-editor-foreground, #d4d4d4);
+    --code-block-border: var(--vscode-editor-lineHighlightBorder, rgba(255, 255, 255, 0.08));
+    --link-color: var(--vscode-textLink-foreground, #3794ff);
+    --toolbar-bg: var(--vscode-sideBarSectionHeader-background, rgba(255, 255, 255, 0.2));
 }
 
 html {
@@ -13,7 +18,7 @@ html {
 
 body {
     margin: 0;
-    padding: 24px 16px 32px;
+    padding: 16px 16px 32px;
     display: flex;
     flex-direction: column;
     min-height: 100vh;
@@ -25,6 +30,7 @@ body {
     box-sizing: border-box;
 }
 
+#toolbar,
 #no-message,
 #chat-container {
     width: min(960px, 100%);
@@ -148,14 +154,18 @@ body {
 
 .message pre {
     position: relative;
-    background-color: var(--vscode-editor-background, #1e1e1e);
-    color: var(--vscode-editor-foreground, #d4d4d4);
+    background-color: var(--code-block-bg);
+    color: var(--code-block-foreground);
     border-radius: 12px;
     padding: 16px 48px 16px 16px;
     margin: 0.6em 0;
     overflow-x: auto;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--code-block-border);
     box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+}
+
+.message a {
+    color: var(--link-color);
 }
 
 .message-header {
@@ -231,6 +241,54 @@ body {
     background-color: rgba(0, 0, 0, 0.08);
 }
 
+.hljs {
+    background: transparent;
+    color: var(--code-block-foreground);
+}
+
+.hljs-comment,
+.hljs-quote {
+    color: var(--vscode-foreground, #6a9955);
+    font-style: italic;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal {
+    color: var(--vscode-charts-blue, #569cd6);
+}
+
+.hljs-string,
+.hljs-title,
+.hljs-name {
+    color: var(--vscode-charts-orange, #ce9178);
+}
+
+.hljs-number,
+.hljs-attr,
+.hljs-symbol {
+    color: var(--vscode-charts-purple, #b267e6);
+}
+
+.hljs-section,
+.hljs-type,
+.hljs-selector-id {
+    color: var(--vscode-charts-green, #4ec9b0);
+}
+
+.hljs-attr,
+.hljs-built_in {
+    color: var(--vscode-charts-blue, #569cd6);
+}
+
+.hljs-emphasis {
+    font-style: italic;
+}
+
+.hljs-strong {
+    font-weight: 700;
+}
+
 @keyframes blink {
 
     0%,
@@ -246,4 +304,58 @@ body {
 
 #no-message {
     padding: 0 2em;
+}
+#toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: var(--toolbar-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 16px 20px;
+    margin-bottom: 12px;
+    gap: 12px;
+    backdrop-filter: blur(12px);
+}
+
+#toolbar .title {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+#toolbar .name {
+    font-weight: 700;
+    font-size: 1.1rem;
+}
+
+#toolbar .tagline {
+    font-size: 0.85rem;
+    color: var(--vscode-descriptionForeground, rgba(0, 0, 0, 0.6));
+}
+
+.toolbar-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.toolbar-actions button {
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    padding: 8px 14px;
+    background-color: var(--surface-card);
+    color: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.toolbar-actions button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.08);
+}
+
+.toolbar-actions button[data-action="clear-chat"] {
+    background-image: linear-gradient(135deg, rgba(255, 99, 72, 0.15), transparent);
+    border-color: rgba(255, 99, 72, 0.3);
 }
