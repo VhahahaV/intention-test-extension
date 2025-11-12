@@ -5,7 +5,7 @@ import shutil
 from generator import IntentionTester
 from dataset import Dataset
 from configs import Configs
-from server import ModelQuerySession
+from core.session import ModelQuerySession
 from typing import Optional
 import pathlib
 from extension_api.collect_pairs.main import dump_collect_pairs
@@ -224,4 +224,3 @@ def get_crucial_facts_offline(coverage_idx: int, offline_facts, focal_method_nam
     top_disc_facts = top_disc_facts_sig
 
     return top_disc_facts, top_disc_facts_sim, top_usages, top_usages_sim
-

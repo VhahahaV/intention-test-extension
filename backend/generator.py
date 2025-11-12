@@ -4,11 +4,11 @@ import re
 
 from pyexpat.errors import messages
 
-from server import ModelQuerySession
+from core.session import ModelQuerySession
+from core.exceptions import GenerationCancelled
 from configs import Configs
 from agents import TestGenAgent, TestRefineAgent
 from test_case_runner import TestCaseRunner
-from exceptions import GenerationCancelled
 
 
 class IntentionTester:
