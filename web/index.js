@@ -2,6 +2,7 @@ const noMessagePrompt = document.getElementById('no-message');
 const chatContainer = document.getElementById('chat-container');
 const toolbar = document.getElementById('toolbar');
 const body = document.body;
+const SCROLL_IDLE_WINDOW_MS = 3000;
 const defaultNoMessageMarkup = noMessagePrompt.innerHTML;
 const waitingNoMessageMarkup = `
     <h1>Intention Test 🧪</h1>
@@ -41,13 +42,14 @@ toolbar?.querySelectorAll('[data-action]').forEach((button) => {
 updateToolbarState();
 updatePlaceholderVisibility();
 
-body.addEventListener('wheel', () => {
+const updateLastScrollTime = () => {
     lastUserScrollTime = Date.now();
-}, { passive: true });
+};
 
-body.addEventListener('mousedown', () => {
-    lastUserScrollTime = Date.now();
-});
+body.addEventListener('wheel', updateLastScrollTime, { passive: true });
+body.addEventListener('mousedown', updateLastScrollTime);
+
+window.addEventListener('message', handleIncomingMessage);
 
 function scrollToLatest() {
     body.scrollTo({
@@ -57,7 +59,7 @@ function scrollToLatest() {
 }
 
 function maybeAutoScroll() {
-    if (Date.now() - lastUserScrollTime > 3000) {
+    if (Date.now() - lastUserScrollTime > SCROLL_IDLE_WINDOW_MS) {
         scrollToLatest();
     }
 }
@@ -293,7 +295,7 @@ function removeTypingAnimation() {
     }
 }
 
-window.addEventListener('message', (event) => {
+function handleIncomingMessage(event) {
     const msg = event.data;
     if (msg?.role && msg?.content) {
         noMessagePrompt.style.display = 'none';
@@ -319,19 +321,24 @@ window.addEventListener('message', (event) => {
         if (messageElement) {
             messageCount += 1;
         }
-    } else if (msg?.cmd) {
-        if (msg.cmd === 'session-state') {
-            const nextState = msg.state ?? SessionState.IDLE;
-            setSessionState(nextState);
-            if (typeof msg.message === 'string' && msg.message.trim().length > 0) {
-                addSystemNotice(msg.message);
-            } else if (nextState === SessionState.STOPPED) {
-                addSystemNotice('生成已停止，不再继续。');
-            }
-        } else if (msg.cmd === 'error') {
-            console.error('[IntentionTest] Webview error message received:', msg);
-        } else if (msg.cmd === 'clear') {
-            trimConversationTo(msg.toIndex ?? 0);
-        }
+        return;
     }
-});
+
+    if (!msg?.cmd) {
+        return;
+    }
+
+    if (msg.cmd === 'session-state') {
+        const nextState = msg.state ?? SessionState.IDLE;
+        setSessionState(nextState);
+        if (typeof msg.message === 'string' && msg.message.trim().length > 0) {
+            addSystemNotice(msg.message);
+        } else if (nextState === SessionState.STOPPED) {
+            addSystemNotice('生成已停止，不再继续。');
+        }
+    } else if (msg.cmd === 'error') {
+        console.error('[IntentionTest] Webview error message received:', msg);
+    } else if (msg.cmd === 'clear') {
+        trimConversationTo(msg.toIndex ?? 0);
+    }
+}

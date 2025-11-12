@@ -35,3 +35,14 @@
 - **会话注册中心**：抽象 `SessionRegistry` 负责线程安全的注册/查询/回收，`server.py` 不再直接操作全局字典，`/session/stop` 能可靠定位到当前会话。
 - **请求校验**：对 Web 请求载荷进行字段校验，缺失参数会在写入会话前立即抛出 400，避免下游才发现结构错误。
 - **多线程服务**：HTTP 服务切换为 `ThreadingMixIn`，允许 VS Code 发起的并发 session 同时执行；同时启用 `allow_reuse_address` 和守护线程，提升可靠性。
+
+## 第五阶段优化
+- **停止链路闭环**：`IntentionTester` 将会话的 `should_stop()` 注入测试生成/微调 Agent，`Agent` 在调用 OpenAI 前后都检查 `GenerationCancelled`，停止按钮按下后真正终止 LLM 重试及 Maven 运行。
+- **Server 兼容运行路径**：`backend/app/server.py` 与 `backend/server.py` 双向容错，既可在仓库根目录运行 `python backend/server.py`，也能在 `backend/` 目录直接运行，方便本地调试。
+- **代码块自适应**：`.message pre` 与 `.message pre code` 加上 `width:100%`、`pre-wrap`、`word-break:break-word` 等属性，长行代码会自动换行或横向滚动，灰色背景不再被撑开。
+- **后端结构优化**：后端代码文件结构调整。
+
+## 第六阶段优化
+- **前端风格统一**：`web/index.js` 提炼 `SCROLL_IDLE_WINDOW_MS`、`handleIncomingMessage`、`updateLastScrollTime` 等辅助函数，事件监听逻辑从匿名函数抽离为具名函数，易读性与可测试性更强。
+- **后端接口收敛**：`backend/app/server.py` 的 `validate_query_payload` 与 `build_session` 明确返回值/参数，配合 `_generate_session_id()` 与具名 docstring，HTTP 入口更加易读。
+- **命名与导入清晰化**：新增的 docstring、类型标注与结构化导入让前后端整体风格与主流开源项目保持一致，为后续审查和工具分析打下基础。

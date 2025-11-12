@@ -6,7 +6,7 @@ import logging
 import socketserver
 import threading
 from http.server import BaseHTTPRequestHandler
-from typing import Any, Dict
+from typing import Any, Dict, Tuple
 
 try:
     from backend import main as generation_entry_module  # when run as package
@@ -48,19 +48,19 @@ def run_generation(query_data: Dict[str, Any], session: ModelQuerySession) -> No
     generation_entry_module.main(**query_data, query_session=session)
 
 
-def build_session(payload: Dict[str, Any], handler: BaseHTTPRequestHandler) -> ModelQuerySession:
-    session_id = payload["session_id"]
+def build_session(session_id: str, data: Dict[str, Any], handler: BaseHTTPRequestHandler) -> ModelQuerySession:
     response_stream = ResponseStream(handler)
     return ModelQuerySession(
         session_id=session_id,
-        raw_data=payload["data"],
+        raw_data=data,
         writer=response_stream,
         executor=run_generation,
         junit_version=_global_junit_version,
     )
 
 
-def validate_query_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
+def validate_query_payload(payload: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
+    """Validate request body and return (session_id, data)."""
     if payload.get("type") != "query":
         raise ValueError("Unsupported request type")
     data = payload.get("data")
@@ -69,10 +69,11 @@ def validate_query_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
     missing = [field for field in ModelQuerySession.required_fields if field not in data]
     if missing:
         raise ValueError(f"Missing required fields: {', '.join(missing)}")
-    return {"session_id": payload.get("session_id") or payload.get("id") or handler_uuid(), "data": data}
+    session_id = payload.get("session_id") or payload.get("id") or _generate_session_id()
+    return session_id, data
 
 
-def handler_uuid() -> str:
+def _generate_session_id() -> str:
     import uuid
 
     return uuid.uuid4().hex
@@ -95,8 +96,8 @@ class QueryHandler(BaseHTTPRequestHandler):
     def _handle_session_request(self) -> None:
         try:
             payload = self._read_json_body()
-            request_payload = validate_query_payload(payload)
-            session = build_session(request_payload, self)
+            session_id, raw_data = validate_query_payload(payload)
+            session = build_session(session_id, raw_data, self)
         except Exception as exc:  # broad catch to surface payload issues
             logger.error("Invalid session request: %s", exc, exc_info=True)
             self._end_with_error(400, "Bad Request", str(exc))
