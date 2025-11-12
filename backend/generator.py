@@ -8,6 +8,7 @@ from server import ModelQuerySession
 from configs import Configs
 from agents import TestGenAgent, TestRefineAgent
 from test_case_runner import TestCaseRunner
+from exceptions import GenerationCancelled
 
 
 class IntentionTester:
@@ -29,16 +30,22 @@ class IntentionTester:
         if self.query_session:
             self.query_session.update_messages(messages)
 
+    def _ensure_not_cancelled(self):
+        if self.query_session and self.query_session.should_stop():
+            raise GenerationCancelled()
+
     def generate_test_case_with_refine(self, 
                                        target_focal_method, target_context, target_test_case_desc, target_test_case_path,
                                        referable_test_case, facts, junit_version,
                                        prohibit_fact: bool = False, query_session: ModelQuerySession | None = None):
         self.generation_with_refine_log = []
         self.query_session = query_session
+        self._ensure_not_cancelled()
 
         target_test_class_name = target_test_case_path.split('/')[-1].replace('.java', '')
         gen_test_case, prompt, messages = self.generate_test_case(target_focal_method, target_context, target_test_class_name, target_test_case_desc, referable_test_case, facts, junit_version, prohibit_fact)
         self.update_messages_to_remote(messages)
+        self._ensure_not_cancelled()
         error_msg, test_status = self.run_test_case(gen_test_case, target_test_case_path)
         self.generation_with_refine_log.append((test_status, prompt, gen_test_case))
 
@@ -47,9 +54,11 @@ class IntentionTester:
             return gen_test_case, test_status, messages
 
         for round in range(self.max_round):
+            self._ensure_not_cancelled()
             gen_test_case, prompt, refine_messages = self.refine(gen_test_case, error_msg, target_focal_method, target_context, target_test_case_desc, target_test_case_path, facts, prohibit_fact)
             messages += refine_messages
             self.update_messages_to_remote(messages)
+            self._ensure_not_cancelled()
             error_msg, test_status = self.run_test_case(gen_test_case, target_test_case_path)
             self.generation_with_refine_log.append((test_status, prompt, gen_test_case))
 
@@ -61,14 +70,17 @@ class IntentionTester:
         return gen_test_case, test_status, messages
 
     def finish_generate(self):
+        self._ensure_not_cancelled()
         messages = self.test_gen_agent.generate_finish()
         return messages
 
     def generate_test_case(self, target_focal_method, target_context, target_test_class_name, target_test_case_desc, referable_test_case, facts, junit_version, prohibit_fact):
+        self._ensure_not_cancelled()
         gen_test_case, prompt, messages = self.test_gen_agent.generate_test_case(target_focal_method, target_context, target_test_class_name, target_test_case_desc, referable_test_case, facts, junit_version, prohibit_fact)
         return gen_test_case, prompt, messages
     
     def refine(self, gen_test_case, error_msg, target_focal_method, target_context, target_test_case_desc, target_test_case_path, facts: list, prohibit_fact):
+        self._ensure_not_cancelled()
         error_msg_lines = error_msg.split('\n')
         error_msg_cut = '\n'.join(error_msg_lines[:self.max_line_error_msg])
 
@@ -76,6 +88,7 @@ class IntentionTester:
         return refined_tc, prompt, messages
 
     def run_test_case(self, test_case, test_case_path):
+        self._ensure_not_cancelled()
         def _extract_error_msg(log):
             error_msg = []
             stop_flag = False

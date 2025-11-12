@@ -9,6 +9,7 @@ export class TesterSession {
     private currentRequest?: ClientRequest;
     private finishActiveRequest?: () => void;
     private isCancelling = false;
+    private activeSessionId?: string;
     
     // setting connectToPort to 0 to start up an internal server
     constructor(updateMessageCallback?: (...args: any[]) => any, errorCallback?: (...args: any[]) => any, showNoRefMsg?: (...args: any[]) => any, connectToPort: number = 0) {
@@ -56,6 +57,7 @@ export class TesterSession {
 
     async startQuery(args: any, cancelCb: (e: any) => any) {
         const requestData = new TextEncoder().encode(JSON.stringify({ type: 'query', data: args }) + '\n');
+        this.activeSessionId = undefined;
 
         const options: RequestOptions = {
             hostname: 'localhost',
@@ -90,12 +92,14 @@ export class TesterSession {
                         if (!(msg.type && msg.data && msg.type === 'status' && msg.data.status === 'start')) {
                             throw TypeError('Failed to receive start message');
                         }
+                        this.activeSessionId = msg.data.session_id;
                         status = 'started';
                     } else if (status !== 'finished') {
                         // receive messages
                         if (msg.type && msg.data) {
                             if (msg.type === 'status' && msg.data.status === 'finish') {
                                 status = 'finished';
+                                this.activeSessionId = undefined;
                                 this.finishActiveRequest?.();
                                 return;
                             } else if (msg.type === 'msg' && msg.data.session_id && msg.data.messages) {
@@ -160,10 +164,45 @@ export class TesterSession {
         this.currentRequest.destroy();
         this.finishActiveRequest?.();
     }
+    
+    public async stopActiveSession(): Promise<void> {
+        this.cancelCurrentQuery();
+        await this.sendStopSignal();
+    }
 
     private resetRequestState(): void {
         this.currentRequest = undefined;
         this.finishActiveRequest = undefined;
         this.isCancelling = false;
+    }
+
+    private async sendStopSignal(): Promise<void> {
+        if (!this.activeSessionId) {
+            return;
+        }
+        const payload = Buffer.from(JSON.stringify({ session_id: this.activeSessionId }), 'utf-8');
+        const options: RequestOptions = {
+            hostname: 'localhost',
+            port: this.connectToPort,
+            path: '/session/stop',
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': payload.length.toString()
+            }
+        };
+
+        await new Promise<void>((resolve) => {
+            const req = request(options, () => {
+                resolve();
+            });
+            req.on('error', (err) => {
+                console.error(`Failed to stop backend session: ${err}`);
+                resolve();
+            });
+            req.write(payload);
+            req.end();
+        });
+        this.activeSessionId = undefined;
     }
 }

@@ -29,3 +29,4 @@
 - **停止/清空联动**：Webview 会在 `session-state` 消息驱动下切换“运行/停止/空闲”状态；停止按钮会向扩展发送 `stop-run` 指令，取消后台请求并在前端展示“已停止”系统消息；清空按钮会在生成中显示等待占位、空闲时恢复欢迎页。
 - **交互指令闭环**：`TesterWebViewProvider` 向 `extension.ts` 暴露消息回调，扩展端统一处理 stop/clear，并通过 `session-state`/`clear` 指令回写 Webview，保持与后端同步。
 - **可维护滚动控制**：封装 `scrollToLatest/trimConversationTo/updatePlaceholderVisibility`，让自动滚动、手动跳转、清空等场景共享逻辑，同时避免代码块撑破消息容器。
+- **后端中止链路**：新增 `/session/stop` 接口、Session 映射与取消事件，前端停止后会通过扩展层向后端广播中止信号，`IntentionTester` 在发起新的 LLM/测试步骤前都会检查并抛出 `GenerationCancelled`，从而避免继续请求大模型。

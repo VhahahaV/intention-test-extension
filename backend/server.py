@@ -12,7 +12,10 @@ import traceback
 import argparse
 import main
 import hashlib
+import uuid
 from typing import Optional, Union
+
+from exceptions import GenerationCancelled
 
 port = 8080
 
@@ -77,14 +80,14 @@ class QueryHandler(http.server.BaseHTTPRequestHandler):
                     return
                 
                 if query_session:
-                    self.send_keep_alive_header()
-                    # self.write_single_line(StatusMessage('start').response())
-                    query_session.write_start_message()
-                    query_session.start_query()
-                    # self.write_single_line(StatusMessage('finish').response())
-                    query_session.write_finish_message()
-                    # no need to flush because the handle_one_request will do that
-                    self.end_session()
+                    try:
+                        self.send_keep_alive_header()
+                        query_session.write_start_message()
+                        query_session.start_query()
+                        query_session.write_finish_message()
+                        self.end_session()
+                    finally:
+                        remove_session(query_session.session_id)
                 else:
                     raise ValueError("No query session can be constructed or retrieved from request")
             
@@ -101,6 +104,30 @@ class QueryHandler(http.server.BaseHTTPRequestHandler):
                 global_junit_version = junit_version
             except Exception as e:
                 logger.error(f"Error handling request. Message: {e}. Request:\n{self.request}\n{traceback.format_exc()}")
+                self.end_with_internal_error(str(e))
+
+        elif self.path == '/session/stop':
+            try:
+                payload_length = int(self.headers.get('Content-Length', 0))
+                request_data = self.rfile.read(payload_length).decode('utf-8')
+                payload = json.loads(request_data)
+                session_id = payload.get('session_id')
+                if not session_id:
+                    self.end_with_request_error('Missing session_id')
+                    return
+                session = get_session(session_id)
+                if not session:
+                    self.send_response(404, 'Session Not Found')
+                    self.end_headers()
+                    return
+                session.request_stop()
+                self.send_response(200, 'Stopping')
+                self.end_headers()
+            except json.JSONDecodeError as e:
+                logger.error(f'Error decoding stop payload: {e}')
+                self.end_with_request_error(str(e))
+            except Exception as e:
+                logger.error(f'Failed to stop session: {e}\n{traceback.format_exc()}')
                 self.end_with_internal_error(str(e))
 
         else:
@@ -146,6 +173,7 @@ class ModelQuerySession:
 
         self.query_data = self.prepare_query_arguments()
         self.session_running = False
+        self._cancel_event = threading.Event()
 
     def prepare_query_arguments(self):
         # do with session_meta_data
@@ -155,8 +183,12 @@ class ModelQuerySession:
         if not self.session_running:
             self.session_running = True
             logger.info(f'Starting query session {self.session_id}')
-            main.main(**self.query_data, query_session = self)
-            self.session_running = False
+            try:
+                main.main(**self.query_data, query_session = self)
+            except GenerationCancelled:
+                logger.info(f'Query session {self.session_id} cancelled by user')
+            finally:
+                self.session_running = False
 
     def update_messages(self, messages):
         self.messages = messages
@@ -164,26 +196,39 @@ class ModelQuerySession:
             'session_id': self.session_id,
             'messages': messages
         }
-        self.handler.write_single_line(ModelMessage(data_to_send).response())
+        self._safe_write(ModelMessage(data_to_send).response())
 
     def write_start_message(self):
         data = {
             'session_id': self.session_id
         }
-        self.handler.write_single_line(StatusMessage('start', data).response())
+        self._safe_write(StatusMessage('start', data).response())
 
     def write_noref_message(self):
         data = {
             'session_id': self.session_id,
             'junit_version': self.junit_version
         }
-        self.handler.write_single_line(NoRefMessage(data).response())
+        self._safe_write(NoRefMessage(data).response())
 
     def write_finish_message(self):
         data = {
             'session_id': self.session_id
         }
-        self.handler.write_single_line(StatusMessage('finish', data).response())
+        self._safe_write(StatusMessage('finish', data).response())
+
+    def request_stop(self):
+        self._cancel_event.set()
+
+    def should_stop(self):
+        return self._cancel_event.is_set()
+
+    def _safe_write(self, payload: bytes):
+        try:
+            self.handler.write_single_line(payload)
+        except BrokenPipeError:
+            logger.warning(f'Connection closed for session {self.session_id}')
+            self.request_stop()
 
 # Not used now, we still send raw time
 def get_hash(s: str):
@@ -191,6 +236,19 @@ def get_hash(s: str):
     return h.hexdigest()
 
 sessions: dict[str, ModelQuerySession] = {}
+sessions_lock = threading.Lock()
+
+def register_session(session: ModelQuerySession) -> None:
+    with sessions_lock:
+        sessions[session.session_id] = session
+
+def remove_session(session_id: str) -> None:
+    with sessions_lock:
+        sessions.pop(session_id, None)
+
+def get_session(session_id: str) -> Optional[ModelQuerySession]:
+    with sessions_lock:
+        return sessions.get(session_id)
 
 def assign_to_session(query_text: str, query_handler: QueryHandler) -> Optional[ModelQuerySession]:
     # do with sessions
@@ -198,8 +256,9 @@ def assign_to_session(query_text: str, query_handler: QueryHandler) -> Optional[
     if query_data['type'] != 'query':
         raise NotImplementedError('None query is not supported yet')
     
-    time_str = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S %Z')
-    new_session = ModelQuerySession(time_str, query_data['data'], query_handler)
+    session_id = uuid.uuid4().hex
+    new_session = ModelQuerySession(session_id, query_data['data'], query_handler)
+    register_session(new_session)
     return new_session
     # TODO sometimes session should be retrived, return None if not found
 

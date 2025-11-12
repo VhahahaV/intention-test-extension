@@ -226,8 +226,11 @@ async function stopActiveSession(ui: TesterWebViewProvider): Promise<void> {
         await sendSessionState(ui, 'idle');
         return;
     }
-    activeSession.cancelCurrentQuery();
-    activeSession = undefined;
+    try {
+        await activeSession.stopActiveSession();
+    } finally {
+        activeSession = undefined;
+    }
     await sendSessionState(ui, 'stopped', '生成已被手动停止。');
 }
 
