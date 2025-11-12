@@ -2,8 +2,11 @@ import os
 import re
 
 import time
+from typing import Callable
 
 from openai import OpenAI
+
+from core.exceptions import GenerationCancelled
 
 
 class Agent:
@@ -19,8 +22,10 @@ class Agent:
         self.top_p = 0.1
         self.seed = 1203
         self.max_completion_tokens = 5120
+        self.cancel_check: Callable[[], bool] = lambda: False
 
     def get_response(self, messages, n=1, skip_deepseek_think: bool=False):
+        self._check_cancel()
         if self.model_name == 'gpt-4o' or self.model_name == 'gpt-3.5-turbo':
             if self.system_prompt:
                 messages = [{'role': 'system', 'content': self.system_prompt}] + messages
@@ -41,12 +46,23 @@ class Agent:
         else:
             raise ValueError(f"Unknown LLM name: {self.model_name}")
         return response
+
+    def set_cancel_check(self, checker: Callable[[], bool] | None) -> None:
+        if checker:
+            self.cancel_check = checker
+        else:
+            self.cancel_check = lambda: False
+
+    def _check_cancel(self) -> None:
+        if self.cancel_check and self.cancel_check():
+            raise GenerationCancelled()
     
     def _get_gpt_response(self, messages, n=1):
         response = []
         max_tries = n + 2
         n_tries = 0
         while len(response) < n:
+            self._check_cancel()
             s_time = time.time()
             try:
                 print(f'\n\n{messages}\n\n')
@@ -61,6 +77,7 @@ class Agent:
                     n=n,
                 )
             except Exception as e:
+                self._check_cancel()
                 print(f'\nError: {e}\n\n')
                 n_tries += 1
                 if n_tries > max_tries:
@@ -72,6 +89,7 @@ class Agent:
             print(f'\nTime consuming for one generation: {time.time()-s_time:.2f} seconds\n\n\n')
 
             response.append(each_response.choices[0].message.content)
+            self._check_cancel()
 
         if n == 1:
             response = response[0]
@@ -83,6 +101,7 @@ class Agent:
         max_tries = n + 2
         n_tries = 0
         while len(response) < n:
+            self._check_cancel()
             s_time = time.time()
             try:
                 print(f'\n\n{messages}\n\n')
@@ -96,9 +115,11 @@ class Agent:
                     n=n,
                 )
             except Exception as e:
+                self._check_cancel()
                 print(f'\nError: {e}\n\n')
                 if "无可用渠道" in str(e):
                     time.sleep(2)
+                    self._check_cancel()
                     continue
 
                 if "potentially violating our usage policy" in str(e) or 'bad response status' in str(e):  # triggered by o1-mini
@@ -117,10 +138,12 @@ class Agent:
                     part_2_1 = '\n'.join(part_2_1_lines)
                     messages[1]['content'] = part_1 + '(with some details omitted):\n```\n' + part_2_1 + '\n```' + part_2_2
 
+                    self._check_cancel()
                     continue
 
                 if "quota is not enough" in str(e):
                     time.sleep(10)
+                    self._check_cancel()
                     continue
                 
                 n_tries += 1
@@ -133,6 +156,7 @@ class Agent:
             print(f'\nTime consuming for one generation: {time.time()-s_time:.2f} seconds\n\n\n')
 
             response.append(each_response.choices[0].message.content)
+            self._check_cancel()
 
         if n == 1:
             response = response[0]
@@ -148,6 +172,7 @@ class Agent:
             messages[0]['content'] += '\n\n<think>\nSkip Thinking\n</think>\n\n'
 
         while len(response) < n:
+            self._check_cancel()
             s_time = time.time()
             try:
                 each_response_raw = self.client.chat.completions.create(
@@ -160,6 +185,7 @@ class Agent:
                     n=1
                 )
             except Exception as e:
+                self._check_cancel()
                 # the input is too long
                 if 'Please reduce the length' in str(e):
                     context_part = messages[0]['content'].split('(with some details omitted):')[1]
@@ -198,6 +224,7 @@ class Agent:
                     each_response = '```\nFailed to generate\n```'
 
             response.append(each_response)
+            self._check_cancel()
         
         if n == 1:
             response = response[0]
