@@ -30,3 +30,8 @@
 - **交互指令闭环**：`TesterWebViewProvider` 向 `extension.ts` 暴露消息回调，扩展端统一处理 stop/clear，并通过 `session-state`/`clear` 指令回写 Webview，保持与后端同步。
 - **可维护滚动控制**：封装 `scrollToLatest/trimConversationTo/updatePlaceholderVisibility`，让自动滚动、手动跳转、清空等场景共享逻辑，同时避免代码块撑破消息容器。
 - **后端中止链路**：新增 `/session/stop` 接口、Session 映射与取消事件，前端停止后会通过扩展层向后端广播中止信号，`IntentionTester` 在发起新的 LLM/测试步骤前都会检查并抛出 `GenerationCancelled`，从而避免继续请求大模型。
+
+## 第四阶段优化
+- **会话注册中心**：抽象 `SessionRegistry` 负责线程安全的注册/查询/回收，`server.py` 不再直接操作全局字典，`/session/stop` 能可靠定位到当前会话。
+- **请求校验**：对 Web 请求载荷进行字段校验，缺失参数会在写入会话前立即抛出 400，避免下游才发现结构错误。
+- **多线程服务**：HTTP 服务切换为 `ThreadingMixIn`，允许 VS Code 发起的并发 session 同时执行；同时启用 `allow_reuse_address` 和守护线程，提升可靠性。

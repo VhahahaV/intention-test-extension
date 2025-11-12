@@ -16,6 +16,7 @@ import uuid
 from typing import Optional, Union
 
 from exceptions import GenerationCancelled
+from session_registry import SessionRegistry
 
 port = 8080
 
@@ -25,6 +26,7 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(stream=sys.stdout, level=logging.INFO, format='[%(asctime)s] [%(levelname)s] %(message)s')
 
 global_junit_version = 4
+session_registry = SessionRegistry()
 
 class StatusMessage:
     def __init__(self, status: str, message: Union[str, dict] = ''):
@@ -87,7 +89,7 @@ class QueryHandler(http.server.BaseHTTPRequestHandler):
                         query_session.write_finish_message()
                         self.end_session()
                     finally:
-                        remove_session(query_session.session_id)
+                        session_registry.remove(query_session.session_id)
                 else:
                     raise ValueError("No query session can be constructed or retrieved from request")
             
@@ -115,7 +117,7 @@ class QueryHandler(http.server.BaseHTTPRequestHandler):
                 if not session_id:
                     self.end_with_request_error('Missing session_id')
                     return
-                session = get_session(session_id)
+                session = session_registry.get(session_id)
                 if not session:
                     self.send_response(404, 'Session Not Found')
                     self.end_headers()
@@ -235,42 +237,39 @@ def get_hash(s: str):
     h = hashlib.sha256(s.encode('utf-8'))
     return h.hexdigest()
 
-sessions: dict[str, ModelQuerySession] = {}
-sessions_lock = threading.Lock()
-
-def register_session(session: ModelQuerySession) -> None:
-    with sessions_lock:
-        sessions[session.session_id] = session
-
-def remove_session(session_id: str) -> None:
-    with sessions_lock:
-        sessions.pop(session_id, None)
-
-def get_session(session_id: str) -> Optional[ModelQuerySession]:
-    with sessions_lock:
-        return sessions.get(session_id)
-
 def assign_to_session(query_text: str, query_handler: QueryHandler) -> Optional[ModelQuerySession]:
-    # do with sessions
     query_data = json.loads(query_text)
-    if query_data['type'] != 'query':
-        raise NotImplementedError('None query is not supported yet')
-    
+    request_payload = validate_query_payload(query_data)
+
     session_id = uuid.uuid4().hex
-    new_session = ModelQuerySession(session_id, query_data['data'], query_handler)
-    register_session(new_session)
+    new_session = ModelQuerySession(session_id, request_payload, query_handler)
+    session_registry.register(new_session)
     return new_session
-    # TODO sometimes session should be retrived, return None if not found
+
+def validate_query_payload(payload: dict) -> dict:
+    if payload.get('type') != 'query':
+        raise ValueError('Unsupported request type')
+    data = payload.get('data')
+    if not isinstance(data, dict):
+        raise ValueError('Query data must be a JSON object')
+    missing = [field for field in ModelQuerySession.required_fields if field not in data]
+    if missing:
+        raise ValueError(f"Missing required fields: {', '.join(missing)}")
+    return data
 
 # def find_open_port():
 #     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
 #         s.bind(('', 0))  # Bind to any available port
 #         return s.getsockname()[1]  # Return the port number
 
+class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+
 def start_http_server(port: int):
     logger.info(f'Starting HTTP server on port {port}')
 
-    httpd = socketserver.TCPServer(("", port), QueryHandler)
+    httpd = ThreadedTCPServer(("", port), QueryHandler)
     port = httpd.server_address[1]
     logger.info(f'HTTP server is started and listening on {port}')
 
