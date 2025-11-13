@@ -56,13 +56,13 @@ jobs:
           if [ -z "$PUB" ]; then echo 'No publisher found in package.json; publish step will be skipped.'; fi
 
       - name: Publish (stable)
-        if: ${{ secrets.VSCE_PAT != '' && steps.meta.outputs.publisher != '' && !contains(github.ref_name, 'rc') && !contains(github.ref_name, 'beta') && !contains(github.ref_name, 'pre') }}
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        if: ${{ env.VSCE_PAT != '' && steps.meta.outputs.publisher != '' && !contains(github.ref_name, 'rc') && !contains(github.ref_name, 'beta') && !contains(github.ref_name, 'pre') }}
         run: npx --yes @vscode/vsce publish
 
       - name: Publish (pre-release)
-        if: ${{ secrets.VSCE_PAT != '' && steps.meta.outputs.publisher != '' && (contains(github.ref_name, 'rc') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'pre')) }}
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        if: ${{ env.VSCE_PAT != '' && steps.meta.outputs.publisher != '' && (contains(github.ref_name, 'rc') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'pre')) }}
         run: npx --yes @vscode/vsce publish --pre-release
