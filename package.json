@@ -4,7 +4,7 @@
   "description": "An LLM-enhanced Java test generator.",
   "version": "0.1.0",
   "engines": {
-    "vscode": "^1.76.0"
+    "vscode": "^1.92.0"
   },
   "categories": [
     "Other"
@@ -93,5 +93,6 @@
     "tree-sitter": "^0.21.1",
     "tree-sitter-java": "^0.21.0",
     "tree-sitter-python": "^0.21.0"
-  }
+  },
+  "publisher": "entropy136"
 }
